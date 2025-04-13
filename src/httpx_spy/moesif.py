@@ -50,11 +50,11 @@ class MoesifHandler(Handler):
 
         as_json = [self.serialize(entry) for entry in requests]
 
-        with self.get_client() as client:
+        async with self.get_client() as client:
             for batch in self.batch(as_json):
-                client.post(
+                await client.post(
                     "/v1/events/batch",
-                    data=batch,
+                    content=batch,
                     headers={"Content-Type": "application/json"},
                 )
 

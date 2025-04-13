@@ -31,7 +31,7 @@ class RequestEntry:
     uri: httpx.URL
     verb: str
     headers: Sequence[tuple[str, str]]
-    body: bytes
+    body: str
     transfer_encoding: Literal["json", "base64"]
 
 
@@ -43,7 +43,7 @@ class ResponseEntry:
     status: int
     ip_address: IPv4Address | IPv6Address
     headers: Sequence[tuple[str, str]]
-    body: bytes
+    body: str
     transfer_encoding: Literal["json", "base64"]
 
 
@@ -369,7 +369,10 @@ class Processor:
         Returns the original, non-monkey-patched HTTPX client class.
         """
 
-        return httpx.AsyncClient(*args, **{**kwargs, "_no_hook": True})
+        client = httpx.AsyncClient(*args, **kwargs)
+        client._no_monkey = True
+
+        return client
 
     def guess_encoding(
         self, content: bytes
@@ -385,9 +388,11 @@ class Processor:
         """
 
         try:
-            return orjson.loads(content), "json"
+            orjson.loads(content)
         except orjson.JSONDecodeError:
             return b64encode(content).decode(), "base64"
+        else:
+            return content.decode(), "json"
 
     def get_metadata(self, request: httpx.Request) -> Mapping[str, Any]:
         """

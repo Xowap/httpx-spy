@@ -12,32 +12,32 @@ class MonkeyClient(httpx.Client.__base__):
     Monkey-patched intermediate base class for Client and AsyncClient
     """
 
-    def __init__(self, *args, **kwargs):
-        if "_no_hook" in kwargs:
-            del kwargs["_no_hook"]
-            no_hook = True
-        else:
-            no_hook = False
+    def __getattribute__(self, item):
+        """
+        We force-inject our hooks into the _event_hooks of httpx
+        """
 
-        if "_processor" in kwargs:
-            processor = kwargs.pop("processor")
-        else:
-            from .processor import get_processor
+        out = super().__getattribute__(item)
 
-            processor = get_processor()
+        if item == "_event_hooks" and not getattr(self, "_no_monkey", False):
+            if hasattr(self, "_processor"):
+                processor = self._processor
+            else:
+                from .processor import get_processor
 
-        super().__init__(*args, **kwargs)
+                processor = get_processor()
 
-        if not no_hook:
             is_async = asyncio.iscoroutinefunction(self.get)
 
-            self._event_hooks["request"].append(
+            out["request"].append(
                 processor.async_handle_request
                 if is_async
                 else processor.sync_handle_request
             )
-            self._event_hooks["response"].append(
+            out["response"].append(
                 processor.sync_handle_response
                 if is_async
                 else processor.async_handle_response
             )
+
+        return out
