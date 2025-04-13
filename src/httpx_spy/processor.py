@@ -41,7 +41,7 @@ class ResponseEntry:
 
     time: datetime
     status: int
-    ip_address: IPv4Address | IPv6Address
+    ip_address: IPv4Address | IPv6Address | None
     headers: Sequence[tuple[str, str]]
     body: str
     transfer_encoding: Literal["json", "base64"]
@@ -499,7 +499,7 @@ class Processor:
                 "server_addr"
             )
             server_ip = ip_address(server_ip_str)
-        except OSError:
+        except (OSError, KeyError):
             server_ip = None
 
         return ResponseEntry(
@@ -596,7 +596,7 @@ class Processor:
                 "server_addr"
             )
             server_ip = ip_address(server_ip_str)
-        except OSError:
+        except (OSError, KeyError):
             server_ip = None
 
         return ResponseEntry(
