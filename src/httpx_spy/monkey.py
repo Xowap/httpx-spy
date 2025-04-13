@@ -7,6 +7,11 @@ import asyncio
 import httpx
 
 
+def _ensure_in_list(lst: list, obj: object) -> None:
+    if not any(x is obj for x in lst):
+        lst.append(obj)
+
+
 class MonkeyClient(httpx.Client.__base__):
     """
     Monkey-patched intermediate base class for Client and AsyncClient
@@ -29,15 +34,21 @@ class MonkeyClient(httpx.Client.__base__):
 
             is_async = asyncio.iscoroutinefunction(self.get)
 
-            out["request"].append(
-                processor.async_handle_request
-                if is_async
-                else processor.sync_handle_request
+            _ensure_in_list(
+                out["request"],
+                (
+                    processor.async_handle_request
+                    if is_async
+                    else processor.sync_handle_request
+                ),
             )
-            out["response"].append(
-                processor.sync_handle_response
-                if is_async
-                else processor.async_handle_response
+            _ensure_in_list(
+                out["response"],
+                (
+                    processor.async_handle_response
+                    if is_async
+                    else processor.sync_handle_response
+                ),
             )
 
         return out

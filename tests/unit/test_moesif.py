@@ -18,9 +18,15 @@ from httpx_spy.processor import (
 
 @pytest.fixture
 def processor():
+    BaseClient = httpx.Client.__base__
+
     p = Processor()
     p.monkey_patch()
-    return p
+
+    yield p
+
+    httpx.Client.__bases__ = (BaseClient,)
+    httpx.AsyncClient.__bases__ = (BaseClient,)
 
 
 @pytest.fixture
