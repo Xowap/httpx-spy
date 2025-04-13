@@ -2,7 +2,7 @@ import abc
 import asyncio
 import logging
 import threading
-from asyncio import CancelledError, QueueEmpty
+from asyncio import CancelledError
 from base64 import b64encode
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -12,11 +12,11 @@ from ipaddress import IPv4Address, IPv6Address, ip_address
 from typing import Any, ClassVar, Literal
 
 import httpx
-import janus
 import orjson
 from asgiref.sync import sync_to_async
 
 from httpx_spy.monkey import MonkeyClient
+from httpx_spy.uniqueue import QueueEmpty, UniQueue
 
 logger = logging.getLogger(__name__)
 
@@ -147,17 +147,20 @@ class Processor:
         field(default_factory=dict, init=False)
     )
     caller_extractor: Callable[[httpx.Request], CallerEntry] | None = None
-    sync_queue: janus.Queue = field(
+    sync_queue: UniQueue = field(
         init=False,
         repr=False,
-        default_factory=lambda: janus.Queue(maxsize=Processor.QUEUE_MAX_SIZE),
+        default_factory=lambda: UniQueue(max_size=Processor.QUEUE_MAX_SIZE),
     )
-    async_queue: janus.Queue = field(
+    async_queue: UniQueue = field(
         init=False,
         repr=False,
-        default_factory=lambda: janus.Queue(maxsize=Processor.QUEUE_MAX_SIZE),
+        default_factory=lambda: UniQueue(max_size=Processor.QUEUE_MAX_SIZE),
     )
     pending_requests: dict[int, Entry] = field(init=False, default_factory=dict)
+    run_t: asyncio.Task | None = field(init=False, default=None)
+
+    flush_interval: timedelta = field(default_factory=lambda: Processor.FLUSH_INTERVAL)
 
     def add_handler(self, handler: Handler) -> None:
         """
@@ -204,17 +207,16 @@ class Processor:
 
         self.metadata_extractors[name] = extractor
 
-    async def empty_queue(self, q: janus.Queue) -> list[EntryToProcess]:
+    async def empty_queue(self, q: UniQueue) -> list[EntryToProcess]:
         """
         Returns all the things currently in the queue
         """
 
         out = []
-        aq = q.async_q
 
         try:
             while True:
-                out.append(await aq.get_nowait())
+                out.append(await q.async_get_nowait())
         except QueueEmpty:
             pass
 
@@ -248,7 +250,7 @@ class Processor:
                 ):
                     req_id = id(response.request)
 
-                    if req_id in self.pending_requests:
+                    if req_id not in self.pending_requests:
                         continue
 
                     self.pending_requests[req_id].response = self.sync_serialize_resp(
@@ -283,7 +285,7 @@ class Processor:
                 ):
                     req_id = id(response.request)
 
-                    if req_id in self.pending_requests:
+                    if req_id not in self.pending_requests:
                         continue
 
                     self.pending_requests[
@@ -331,7 +333,7 @@ class Processor:
         while True:
             # noinspection PyBroadException
             try:
-                await asyncio.sleep(self.FLUSH_INTERVAL.total_seconds())
+                await asyncio.sleep(self.flush_interval.total_seconds())
 
                 async_todo = await self.empty_queue(self.async_queue)
                 sync_todo = await self.empty_queue(self.sync_queue)
@@ -350,10 +352,26 @@ class Processor:
         Starts the processor in its own thread
         """
 
+        def _run():
+            try:
+                loop.run_until_complete(self.run_t)
+            except CancelledError:
+                pass
+
         self.monkey_patch()
         loop = asyncio.new_event_loop()
-        thread = threading.Thread(target=lambda: loop.run_forever(), daemon=True)
+        self.run_t = loop.create_task(self.run())
+        thread = threading.Thread(target=_run, daemon=True)
         thread.start()
+
+    def stop(self) -> None:
+        """
+        Stops the processing thread
+        """
+
+        if self.run_t:
+            self.run_t.cancel()
+            self.run_t = None
 
     def monkey_patch(self) -> None:
         """
@@ -423,7 +441,7 @@ class Processor:
         caller = self.get_caller(request)
         request_time = datetime.now(tz=UTC)
 
-        self.sync_queue.sync_q.put(
+        self.sync_queue.sync_put(
             EntryToProcess(
                 request=request,
                 request_time=request_time,
@@ -439,7 +457,7 @@ class Processor:
 
         response_time = datetime.now(tz=UTC)
 
-        self.sync_queue.sync_q.put(
+        self.sync_queue.sync_put(
             ResponseToProcess(
                 response=response,
                 response_time=response_time,
@@ -520,7 +538,7 @@ class Processor:
         caller = self.get_caller(request)
         request_time = datetime.now(tz=UTC)
 
-        await self.async_queue.async_q.put(
+        await self.async_queue.async_put(
             EntryToProcess(
                 request=request,
                 request_time=request_time,
@@ -536,7 +554,7 @@ class Processor:
 
         response_time = datetime.now(tz=UTC)
 
-        await self.async_queue.async_q.put(
+        await self.async_queue.async_put(
             ResponseToProcess(
                 response=response,
                 response_time=response_time,

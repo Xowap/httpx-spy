@@ -7,9 +7,23 @@ import asyncio
 import httpx
 
 
+class _MonkeyProxy:
+    """
+    Proxies the hooks so that we know that's our hooks and not something from
+    somewhere else
+    """
+
+    def __init__(self, obj: object):
+        self.obj = obj
+
+    def __call__(self, *args, **kwargs):
+        # noinspection PyCallingNonCallable
+        return self.obj(*args, **kwargs)
+
+
 def _ensure_in_list(lst: list, obj: object) -> None:
-    if not any(x is obj for x in lst):
-        lst.append(obj)
+    if not any(isinstance(x, _MonkeyProxy) for x in lst):
+        lst.append(_MonkeyProxy(obj))
 
 
 class MonkeyClient(httpx.Client.__base__):
