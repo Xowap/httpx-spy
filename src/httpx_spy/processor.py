@@ -361,7 +361,7 @@ class Processor:
         self.monkey_patch()
         loop = asyncio.new_event_loop()
         self.run_t = loop.create_task(self.run())
-        thread = threading.Thread(target=_run, daemon=True)
+        thread = threading.Thread(target=_run, daemon=True, name="HttpxSpy")
         thread.start()
 
     def stop(self) -> None:
@@ -437,6 +437,8 @@ class Processor:
         Synchronous version of the httpx hook.
         """
 
+        logger.debug("Spied on request: %s %s", request.method, request.url)
+
         metadata = self.get_metadata(request)
         caller = self.get_caller(request)
         request_time = datetime.now(tz=UTC)
@@ -454,6 +456,13 @@ class Processor:
         """
         Synchronous version of the httpx hook.
         """
+
+        logger.debug(
+            "Spied on response: %s %s %s",
+            response.status_code,
+            response.request.method,
+            response.request.url,
+        )
 
         response_time = datetime.now(tz=UTC)
 
@@ -534,6 +543,8 @@ class Processor:
         Synchronous version of the httpx hook.
         """
 
+        logger.debug("Spied on request: %s %s", request.method, request.url)
+
         metadata = self.get_metadata(request)
         caller = self.get_caller(request)
         request_time = datetime.now(tz=UTC)
@@ -551,6 +562,13 @@ class Processor:
         """
         Synchronous version of the httpx hook.
         """
+
+        logger.debug(
+            "Spied on response: %s %s %s",
+            response.status_code,
+            response.request.method,
+            response.request.url,
+        )
 
         response_time = datetime.now(tz=UTC)
 

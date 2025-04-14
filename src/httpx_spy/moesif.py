@@ -2,6 +2,7 @@
 Elements of the Moesif integration
 """
 
+import logging
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
@@ -11,6 +12,8 @@ import httpx
 import orjson
 
 from .processor import Entry, Handler
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,6 +55,7 @@ class MoesifHandler(Handler):
 
         async with self.get_client() as client:
             for batch in self.batch(as_json):
+                logger.debug("Sending to Moesif a batch of %s bytes", len(batch))
                 await client.post(
                     "/v1/events/batch",
                     content=batch,
