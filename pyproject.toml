@@ -3,10 +3,19 @@ name = "httpx-spy"
 version = "0.1.0"
 description = "A tool to spy on httpx and log requests and responses."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.9"
 dependencies = [
     "httpx",
     "orjson",
+    "asgiref",
+]
+
+[project.optional-dependencies]
+django = [
+    "django",
+]
+celery = [
+    "celery",
 ]
 
 [dependency-groups]
@@ -16,7 +25,7 @@ dev = [
     "pytest-httpx",
     "pytest-mock",
     "ruff",
-    "asgiref",
+    "hatch",
 ]
 
 [build-system]
