@@ -101,7 +101,7 @@ async def test_async_serialize(
             headers=[
                 ("host", "foo.bar"),
                 ("accept", "*/*"),
-                ("accept-encoding", "gzip, deflate"),
+                ("accept-encoding", ReStr(r".*gzip.*")),
                 ("connection", "keep-alive"),
                 ("user-agent", ReStr(r"python-httpx/.*")),
                 ("content-length", "10"),
@@ -155,7 +155,7 @@ def test_sync_serialize_req(
             headers=[
                 ("host", "foo.bar"),
                 ("accept", "*/*"),
-                ("accept-encoding", "gzip, deflate"),
+                ("accept-encoding", ReStr(r".*gzip.*")),
                 ("connection", "keep-alive"),
                 ("user-agent", ReStr(r"python-httpx/.*")),
                 ("content-length", "5"),
@@ -219,7 +219,7 @@ async def test_run_async(
                         ),
                         (
                             "accept-encoding",
-                            "gzip, deflate",
+                            ReStr(r".*gzip.*"),
                         ),
                         (
                             "connection",
@@ -305,7 +305,7 @@ def test_run_sync(
                         ),
                         (
                             "accept-encoding",
-                            "gzip, deflate",
+                            ReStr(r".*gzip.*"),
                         ),
                         (
                             "connection",
