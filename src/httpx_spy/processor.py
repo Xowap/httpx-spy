@@ -63,6 +63,7 @@ class MetaEntry:
 
     direction: Literal["incoming", "outgoing", "internal"] = "outgoing"
     metadata: Json = None
+    trace_id: str | None = None
 
 
 @dataclass
@@ -432,6 +433,16 @@ class Processor:
         else:
             return CallerEntry()
 
+    def get_trace_id(self, request: httpx.Request) -> str | None:
+        """Heuristic to guess the OpenTelemetry trace_id"""
+
+        if baggage_raw := request.headers.get("baggage"):
+            baggage = dict(
+                (p := x.partition("=")) and (p[0], p[2]) for x in baggage_raw.split(",")
+            )
+
+            return baggage.get("sentry-trace_id")
+
     def sync_handle_request(self, request: httpx.Request) -> None:
         """
         Synchronous version of the httpx hook.
@@ -499,6 +510,7 @@ class Processor:
         meta = MetaEntry(
             direction="outgoing",
             metadata=metadata,
+            trace_id=self.get_trace_id(request),
         )
 
         return Entry(
@@ -605,6 +617,7 @@ class Processor:
         meta = MetaEntry(
             direction="outgoing",
             metadata=metadata,
+            trace_id=self.get_trace_id(request),
         )
 
         return Entry(
