@@ -8,6 +8,7 @@ dependencies = [
     "httpx",
     "orjson",
     "asgiref",
+    "tenacity",
 ]
 
 [project.optional-dependencies]
