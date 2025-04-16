@@ -1,6 +1,6 @@
 [project]
 name = "httpx-spy"
-version = "0.1.1"
+version = "0.1.2"
 description = "A tool to spy on httpx and log requests and responses."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -8,6 +8,7 @@ dependencies = [
     "httpx",
     "orjson",
     "asgiref",
+    "tenacity",
 ]
 
 [project.optional-dependencies]

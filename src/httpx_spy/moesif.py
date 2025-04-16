@@ -10,6 +10,7 @@ from typing import ClassVar
 
 import httpx
 import orjson
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 from .processor import Entry, Handler
 
@@ -39,6 +40,7 @@ class MoesifHandler(Handler):
         return self.processor.get_client(
             base_url=self.base_url,
             headers={"X-Moesif-Application-Id": self.app_id},
+            timeout=30,
         )
 
     async def handle(self, requests: Sequence[Entry]):
@@ -56,11 +58,20 @@ class MoesifHandler(Handler):
         async with self.get_client() as client:
             for batch in self.batch(as_json):
                 logger.debug("Sending to Moesif a batch of %s bytes", len(batch))
-                await client.post(
-                    "/v1/events/batch",
-                    content=batch,
-                    headers={"Content-Type": "application/json"},
-                )
+                await self._post_batch(client, batch)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_fixed(5),
+        retry=retry_if_exception_type(httpx.HTTPError),
+    )
+    async def _post_batch(self, client: httpx.AsyncClient, batch: bytes) -> None:
+        resp = await client.post(
+            "/v1/events/batch",
+            content=batch,
+            headers={"Content-Type": "application/json"},
+        )
+        resp.raise_for_status()
 
     def batch(self, as_json: list[dict]) -> Iterator[bytes]:
         """
